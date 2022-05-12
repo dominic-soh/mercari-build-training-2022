@@ -103,6 +103,20 @@ func (itemsArray *ItemsArray) addToItemArray(item Item) []Item {
 	return itemsArray.Items
 }
 
+func getItems(c echo.Context) error {
+	filebytes, e := os.ReadFile("items.json")
+	var msg ItemsArray
+	if e != nil {
+		fmt.Println(e)
+
+	}
+	err := json.Unmarshal(filebytes, &msg)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return c.JSON(http.StatusOK, msg)
+}
+
 func getImg(c echo.Context) error {
 	// Create image path
 	imgPath := path.Join(ImgDir, c.Param("itemImg"))
@@ -138,6 +152,7 @@ func main() {
 	// Routes
 	e.GET("/", root)
 	e.POST("/items", addItem)
+	e.GET("/items", getItems)
 	e.GET("/image/:itemImg", getImg)
 
 	// Start server
