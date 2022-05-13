@@ -198,9 +198,9 @@ func getItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, msg)
 }
 
-func getImg(c echo.Context) error {
-	// Create image path
-	imgPath := path.Join(ImgDir, c.Param("itemImg"))
+func searchItems(c echo.Context) error {
+	// Get form values
+	keyword := c.QueryParam("keyword")
 
 	// Initialise DB
 	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
@@ -258,8 +258,10 @@ func main() {
 
 	// Routes
 	e.GET("/", root)
-	e.POST("/items", addItem)
-	e.GET("/items", getItems)
+	e.POST("/items", addItemDB)
+	e.GET("/items", getItemsDB)
+	e.GET("/test", test)
+	e.GET("search", searchItems)
 	e.GET("/image/:itemImg", getImg)
 
 	// Start server
