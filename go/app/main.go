@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -26,11 +28,7 @@ type Item struct {
 	ID       uint `json:"-"`
 	Name     string
 	Category string
-}
-
-type PrintItem struct {
-	Name     string
-	Category string
+	Image    string
 }
 
 type ItemsArray struct {
@@ -143,6 +141,18 @@ func addItemDB(c echo.Context) error {
 	// Get form data
 	name := c.FormValue("name")
 	category := c.FormValue("category")
+	image := c.FormValue("image")
+
+	// Hash image
+	file, err := os.ReadFile("./images/" + image)
+	if err != nil {
+		fmt.Println(err)
+	}
+	hash := sha256.New()
+	hash.Write([]byte(file))
+	huh := hash.Sum(nil)
+	extension := hex.EncodeToString(huh[:]) + ".jpg"
+	fmt.Printf("%x", hash.Sum(nil))
 
 	// Initialise DB
 	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
@@ -154,7 +164,7 @@ func addItemDB(c echo.Context) error {
 	db.AutoMigrate(&Item{})
 
 	// Create
-	db.Create(&Item{Name: name, Category: category})
+	db.Create(&Item{Name: name, Category: category, Image: extension})
 
 	message := fmt.Sprintf("item received: %s", name)
 	res := Response{Message: message}
