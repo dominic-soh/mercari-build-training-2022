@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -184,19 +183,19 @@ func getItemsDB(c echo.Context) error {
 	return c.JSON(http.StatusOK, itemsArray)
 }
 
-func getItems(c echo.Context) error {
-	filebytes, e := os.ReadFile("items.json")
-	var msg ItemsArray
-	if e != nil {
-		fmt.Println(e)
+// func getItems(c echo.Context) error {
+// 	filebytes, e := os.ReadFile("items.json")
+// 	var msg ItemsArray
+// 	if e != nil {
+// 		fmt.Println(e)
 
-	}
-	err := json.Unmarshal(filebytes, &msg)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return c.JSON(http.StatusOK, msg)
-}
+// 	}
+// 	err := json.Unmarshal(filebytes, &msg)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+// 	return c.JSON(http.StatusOK, msg)
+// }
 
 func searchItems(c echo.Context) error {
 	// Get form values
@@ -222,23 +221,6 @@ func searchItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, itemsArray)
 }
 
-func test(c echo.Context) error {
-	// Initialise DB
-	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
-
-	// Migrate the schema
-	db.AutoMigrate(&Item{})
-
-	// Search
-	var item Item
-	db.First(&item, 2)
-
-	return c.JSON(http.StatusOK, item)
-}
-
 func main() {
 	e := echo.New()
 
@@ -260,7 +242,6 @@ func main() {
 	e.GET("/", root)
 	e.POST("/items", addItemDB)
 	e.GET("/items", getItemsDB)
-	e.GET("/test", test)
 	e.GET("search", searchItems)
 	e.GET("/image/:itemImg", getImg)
 
