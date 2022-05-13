@@ -142,45 +142,60 @@ func addItemDB(c echo.Context) error {
 	name := c.FormValue("name")
 	category := c.FormValue("category")
 	image := c.FormValue("image")
+	// Initialise DB
+	db := initialiseDB()
 
 	// Hash image
 	file, err := os.ReadFile("./images/" + image)
 	if err != nil {
 		fmt.Println(err)
+		c.Logger().Debugf("Image not found: %s", image)
+		imgPath := path.Join(ImgDir, "default.jpg")
+		defaultFile, _ := os.ReadFile(imgPath)
+		extension := hashImage(defaultFile)
+		// Create
+		db.Create(&Item{Name: name, Category: category, Image: extension})
+		message := fmt.Sprintf("item received: %s", name)
+		res := Response{Message: message}
+
+		return c.JSON(http.StatusOK, res)
+	} else {
+		extension := hashImage(file)
+
+		// Create
+		db.Create(&Item{Name: name, Category: category, Image: extension})
+
+		message := fmt.Sprintf("item received: %s", name)
+		res := Response{Message: message}
+
+		return c.JSON(http.StatusOK, res)
 	}
+}
+
+func initialiseDB() *gorm.DB {
+	// Initialise DB
+	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
+	if err != nil {
+		panic("failed to connect database")
+	}
+
+	// Migrate the schema
+	db.AutoMigrate(&Item{})
+
+	return db
+}
+
+func hashImage(file []byte) string {
 	hash := sha256.New()
 	hash.Write([]byte(file))
 	huh := hash.Sum(nil)
 	extension := hex.EncodeToString(huh[:]) + ".jpg"
-	fmt.Printf("%x", hash.Sum(nil))
-
-	// Initialise DB
-	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
-
-	// Migrate the schema
-	db.AutoMigrate(&Item{})
-
-	// Create
-	db.Create(&Item{Name: name, Category: category, Image: extension})
-
-	message := fmt.Sprintf("item received: %s", name)
-	res := Response{Message: message}
-
-	return c.JSON(http.StatusOK, res)
+	return extension
 }
 
 func getItemsDB(c echo.Context) error {
 	// Initialise DB
-	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
-
-	// Migrate the schema
-	db.AutoMigrate(&Item{})
+	db := initialiseDB()
 
 	// Read
 	var items []Item
@@ -191,6 +206,20 @@ func getItemsDB(c echo.Context) error {
 	var itemsArray = ItemsArray{itemsCopy}
 
 	return c.JSON(http.StatusOK, itemsArray)
+}
+
+func getItemDetailDB(c echo.Context) error {
+	// Get ID
+	id := c.Param("itemId")
+
+	// Initialise DB
+	db := initialiseDB()
+
+	// Read
+	var item Item
+	db.First(&item, id)
+
+	return c.JSON(http.StatusOK, item)
 }
 
 // func getItems(c echo.Context) error {
@@ -212,13 +241,7 @@ func searchItems(c echo.Context) error {
 	keyword := c.QueryParam("keyword")
 
 	// Initialise DB
-	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
-
-	// Migrate the schema
-	db.AutoMigrate(&Item{})
+	db := initialiseDB()
 
 	// Search
 	var items []Item
@@ -254,6 +277,7 @@ func main() {
 	e.GET("/items", getItemsDB)
 	e.GET("search", searchItems)
 	e.GET("/image/:itemImg", getImg)
+	e.GET("items/:itemId", getItemDetailDB)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
