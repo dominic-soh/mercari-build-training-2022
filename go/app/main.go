@@ -24,11 +24,23 @@ type Response struct {
 	Message string `json:"message"`
 }
 
-type Item struct {
+type ItemResponse struct {
 	ID       uint `json:"-"`
 	Name     string
 	Category string
 	Image    string
+}
+
+type Item struct {
+	ID         uint `json:"-"`
+	Name       string
+	CategoryID uint
+	Image      string
+}
+
+type Category struct {
+	ID   uint
+	Name string `gorm:"unique"`
 }
 
 type ItemsArray struct {
@@ -144,6 +156,10 @@ func addItemDB(c echo.Context) error {
 	image := c.FormValue("image")
 	// Initialise DB
 	db := initialiseDB()
+	db.Create(&Category{Name: category})
+	// Find CategoryID
+	var categoryDBObj Category
+	db.Where("name = ?", category).First(&categoryDBObj)
 
 	// Hash image
 	file, err := os.ReadFile("./images/" + image)
@@ -154,7 +170,7 @@ func addItemDB(c echo.Context) error {
 		defaultFile, _ := os.ReadFile(imgPath)
 		extension := hashImage(defaultFile)
 		// Create
-		db.Create(&Item{Name: name, Category: category, Image: extension})
+		db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
 		message := fmt.Sprintf("item received: %s", name)
 		res := Response{Message: message}
 
@@ -163,7 +179,7 @@ func addItemDB(c echo.Context) error {
 		extension := hashImage(file)
 
 		// Create
-		db.Create(&Item{Name: name, Category: category, Image: extension})
+		db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
 
 		message := fmt.Sprintf("item received: %s", name)
 		res := Response{Message: message}
@@ -181,6 +197,7 @@ func initialiseDB() *gorm.DB {
 
 	// Migrate the schema
 	db.AutoMigrate(&Item{})
+	db.AutoMigrate(&Category{})
 
 	return db
 }
@@ -208,6 +225,17 @@ func getItemsDB(c echo.Context) error {
 	return c.JSON(http.StatusOK, itemsArray)
 }
 
+func getCategoryDB(c echo.Context) error {
+	// Initialise DB
+	db := initialiseDB()
+
+	// Read
+	var category []Category
+	db.Find(&category)
+
+	return c.JSON(http.StatusOK, category)
+}
+
 func getItemDetailDB(c echo.Context) error {
 	// Get ID
 	id := c.Param("itemId")
@@ -216,10 +244,14 @@ func getItemDetailDB(c echo.Context) error {
 	db := initialiseDB()
 
 	// Read
-	var item Item
-	db.First(&item, id)
-
-	return c.JSON(http.StatusOK, item)
+	// var item Item
+	// db.First(&item, id)
+	// var category Category
+	// db.First(&category, item.CategoryID)
+	// itemResponse := ItemResponse{ID: item.ID, Name: item.Name, Category: category.Name, Image: item.Image}
+	var itemResponse ItemResponse
+	db.Table("items").Select("items.id", "items.name", "categories.name", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.id = ?", id).Find(&itemResponse)
+	return c.JSON(http.StatusOK, itemResponse)
 }
 
 // func getItems(c echo.Context) error {
@@ -278,6 +310,7 @@ func main() {
 	e.GET("search", searchItems)
 	e.GET("/image/:itemImg", getImg)
 	e.GET("items/:itemId", getItemDetailDB)
+	e.GET("/category", getCategoryDB)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
