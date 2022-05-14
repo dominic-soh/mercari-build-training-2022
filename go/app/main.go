@@ -43,8 +43,8 @@ type Category struct {
 	Name string `gorm:"unique"`
 }
 
-type ItemsArray struct {
-	Items []Item `json:"items"`
+type ItemsResponseArray struct {
+	Items []ItemResponse `json:"items"`
 }
 
 func root(c echo.Context) error {
@@ -215,14 +215,14 @@ func getItemsDB(c echo.Context) error {
 	db := initialiseDB()
 
 	// Read
-	var items []Item
-	db.Find(&items)
+	var itemsResponse []ItemResponse
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Find(&itemsResponse)
 
-	itemsCopy := make([]Item, len(items))
-	copy(itemsCopy, items)
-	var itemsArray = ItemsArray{itemsCopy}
+	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
+	copy(itemsResponseCopy, itemsResponse)
+	var itemsResponseArray = ItemsResponseArray{itemsResponseCopy}
 
-	return c.JSON(http.StatusOK, itemsArray)
+	return c.JSON(http.StatusOK, itemsResponseArray)
 }
 
 func getCategoryDB(c echo.Context) error {
@@ -244,13 +244,8 @@ func getItemDetailDB(c echo.Context) error {
 	db := initialiseDB()
 
 	// Read
-	// var item Item
-	// db.First(&item, id)
-	// var category Category
-	// db.First(&category, item.CategoryID)
-	// itemResponse := ItemResponse{ID: item.ID, Name: item.Name, Category: category.Name, Image: item.Image}
 	var itemResponse ItemResponse
-	db.Table("items").Select("items.id", "items.name", "categories.name", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.id = ?", id).Find(&itemResponse)
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.id = ?", id).Find(&itemResponse)
 	return c.JSON(http.StatusOK, itemResponse)
 }
 
@@ -278,12 +273,14 @@ func searchItems(c echo.Context) error {
 	// Search
 	var items []Item
 	db.Where("name = ?", keyword).Find(&items)
+	var itemsResponse []ItemResponse
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.name = ?", keyword).Find(&itemsResponse)
 
-	itemsCopy := make([]Item, len(items))
-	copy(itemsCopy, items)
-	var itemsArray = ItemsArray{itemsCopy}
+	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
+	copy(itemsResponseCopy, itemsResponse)
+	var itemsResponseArray = ItemsResponseArray{itemsResponseCopy}
 
-	return c.JSON(http.StatusOK, itemsArray)
+	return c.JSON(http.StatusOK, itemsResponseArray)
 }
 
 func main() {
