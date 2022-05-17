@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 
 interface Item {
-  id: number;
-  name: string;
-  category: string;
-  image_filename: string;
+  Name: string;
+  Category: string;
+  Image_filename: string;
 };
 
 const server = process.env.API_URL || 'http://127.0.0.1:9000';
-const placeholderImage = process.env.PUBLIC_URL + '/logo192.png';
+// const placeholderImage = process.env.PUBLIC_URL + '/logo192.png';
 
 interface Prop {
   reload?: boolean;
@@ -31,7 +30,7 @@ export const ItemList: React.FC<Prop> = (props) => {
       .then(response => response.json())
       .then(data => {
         console.log('GET success:', data);
-        setItems(data);
+        setItems(data.items);
         onLoadCompleted && onLoadCompleted();
       })
       .catch(error => {
@@ -41,21 +40,22 @@ export const ItemList: React.FC<Prop> = (props) => {
 
   useEffect(() => {
     if (reload) {
-      fetchItems();
+      fetchItems()
     }
   }, [reload]);
+  
 
   return (
     <div>
-      {items.map((item) => {
+      {items.map((item, index) => {
         return (
-          <div key={item.id} className='ItemList'>
+          <div key={index} className='ItemList'>
             {/* TODO: Task 1: Replace the placeholder image with the item image */}
-            <img src={placeholderImage} />
+            <img src={server + "/image/" + item.Image_filename} alt="dog"/>
             <p>
-              <span>Name: {item.name}</span>
+              <span>Name: {item.Name}</span>
               <br />
-              <span>Category: {item.category}</span>
+              <span>Category: {item.Category}</span>
             </p>
           </div>
         )
