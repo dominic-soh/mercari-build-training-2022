@@ -49,7 +49,7 @@ export const ItemList: React.FC<Prop> = (props) => {
     <div>
       {items.map((item, index) => {
         return (
-          <div key={index} className='ItemList'>
+          <div key={index} className='ItemList' data-testid={index}>
             {/* TODO: Task 1: Replace the placeholder image with the item image */}
             <img src={server + "/image/" + item.Image_filename} alt="dog"/>
             <p>
