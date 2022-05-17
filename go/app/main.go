@@ -52,6 +52,160 @@ func root(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func getImg(c echo.Context) error {
+	// Create image path
+	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
+
+	if !strings.HasSuffix(imgPath, ".jpg") {
+		res := Response{Message: "Image path does not end with .jpg"}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	if _, err := os.Stat(imgPath); err != nil {
+		c.Logger().Debugf("Image not found: %s", imgPath)
+		imgPath = path.Join(ImgDir, "default.jpg")
+	}
+	return c.File(imgPath)
+}
+
+func addItemDB(c echo.Context) error {
+	// Get form data
+	name := c.FormValue("name")
+	category := c.FormValue("category")
+	// Initialise DB
+	db := initialiseDB()
+	db.Create(&Category{Name: category})
+	// Find CategoryID
+	var categoryDBObj Category
+	db.Where("name = ?", category).First(&categoryDBObj)
+
+	// Get image
+	image, err := c.FormFile("image")
+	if err != nil {
+		fmt.Println(err)
+		res := Response{Message: err.Error()}
+		return c.JSON(http.StatusOK, res)
+	}
+
+	// Hash image filename
+	extension := hashImage([]byte(image.Filename))
+
+	db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
+	message := fmt.Sprintf("item received: %s", image.Filename)
+	res := Response{Message: message}
+	return c.JSON(http.StatusOK, res)
+}
+
+func initialiseDB() *gorm.DB {
+	// Initialise DB
+	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
+	if err != nil {
+		panic("failed to connect database")
+	}
+
+	// Migrate the schema
+	db.AutoMigrate(&Item{})
+	db.AutoMigrate(&Category{})
+
+	return db
+}
+
+func hashImage(file []byte) string {
+	hash := sha256.New()
+	hash.Write([]byte(file))
+	huh := hash.Sum(nil)
+	extension := hex.EncodeToString(huh[:]) + ".jpg"
+	return extension
+}
+
+func getItemsDB(c echo.Context) error {
+	// Initialise DB
+	db := initialiseDB()
+
+	// Read
+	var itemsResponse []ItemResponse
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Find(&itemsResponse)
+
+	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
+	copy(itemsResponseCopy, itemsResponse)
+	var itemsResponseArray = ItemsResponseArray{itemsResponseCopy}
+
+	return c.JSON(http.StatusOK, itemsResponseArray)
+}
+
+func getCategoryDB(c echo.Context) error {
+	// Initialise DB
+	db := initialiseDB()
+
+	// Read
+	var category []Category
+	db.Find(&category)
+
+	return c.JSON(http.StatusOK, category)
+}
+
+func getItemDetailDB(c echo.Context) error {
+	// Get ID
+	id := c.Param("itemId")
+
+	// Initialise DB
+	db := initialiseDB()
+
+	// Read
+	var itemResponse ItemResponse
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.id = ?", id).Find(&itemResponse)
+	return c.JSON(http.StatusOK, itemResponse)
+}
+
+func searchItems(c echo.Context) error {
+	// Get form values
+	keyword := c.QueryParam("keyword")
+
+	// Initialise DB
+	db := initialiseDB()
+
+	// Search
+	var items []Item
+	db.Where("name = ?", keyword).Find(&items)
+	var itemsResponse []ItemResponse
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.name = ?", keyword).Find(&itemsResponse)
+
+	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
+	copy(itemsResponseCopy, itemsResponse)
+	var itemsResponseArray = ItemsResponseArray{itemsResponseCopy}
+
+	return c.JSON(http.StatusOK, itemsResponseArray)
+}
+
+func main() {
+	e := echo.New()
+
+	// Middleware
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.Logger.SetLevel(log.INFO)
+
+	front_url := os.Getenv("FRONT_URL")
+	if front_url == "" {
+		front_url = "http://localhost:3000"
+	}
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{front_url},
+		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
+	}))
+
+	// Routes
+	e.GET("/", root)
+	e.POST("/items", addItemDB)
+	e.GET("/items", getItemsDB)
+	e.GET("search", searchItems)
+	e.GET("items/:itemId", getItemDetailDB)
+	e.GET("/category", getCategoryDB)
+	e.GET("/image/:imageFilename", getImg)
+
+	// Start server
+	e.Logger.Fatal(e.Start(":9000"))
+}
+
 // func addItem(c echo.Context) error {
 // 	// Get form data
 // 	name := c.FormValue("name")
@@ -134,120 +288,30 @@ func root(c echo.Context) error {
 // 	return c.JSON(http.StatusOK, msg)
 // }
 
-func getImg(c echo.Context) error {
-	// Create image path
-	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
+// // Hash image
+// file, err := os.ReadFile(image)
+// if err != nil {
+// 	c.Logger().Debugf("Image not found: %s", image)
+// 	imgPath := path.Join(ImgDir, "default.jpg")
+// 	defaultFile, _ := os.ReadFile(imgPath)
+// 	extension := hashImage(defaultFile)
+// 	// Create
+// 	db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
+// 	message := fmt.Sprintf("item received: %s", name)
+// 	res := Response{Message: message}
 
-	if !strings.HasSuffix(imgPath, ".jpg") {
-		res := Response{Message: "Image path does not end with .jpg"}
-		return c.JSON(http.StatusBadRequest, res)
-	}
-	if _, err := os.Stat(imgPath); err != nil {
-		c.Logger().Debugf("Image not found: %s", imgPath)
-		imgPath = path.Join(ImgDir, "default.jpg")
-	}
-	return c.File(imgPath)
-}
+// 	return c.JSON(http.StatusOK, res)
+// } else {
+// 	extension := hashImage(file)
 
-func addItemDB(c echo.Context) error {
-	// Get form data
-	name := c.FormValue("name")
-	category := c.FormValue("category")
-	image := c.FormValue("image")
-	// Initialise DB
-	db := initialiseDB()
-	db.Create(&Category{Name: category})
-	// Find CategoryID
-	var categoryDBObj Category
-	db.Where("name = ?", category).First(&categoryDBObj)
+// 	// Create
+// 	db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
 
-	// Hash image
-	file, err := os.ReadFile("./images/" + image)
-	if err != nil {
-		fmt.Println(err)
-		c.Logger().Debugf("Image not found: %s", image)
-		imgPath := path.Join(ImgDir, "default.jpg")
-		defaultFile, _ := os.ReadFile(imgPath)
-		extension := hashImage(defaultFile)
-		// Create
-		db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
-		message := fmt.Sprintf("item received: %s", name)
-		res := Response{Message: message}
+// 	message := fmt.Sprintf("item received: %s", name)
+// 	res := Response{Message: message}
 
-		return c.JSON(http.StatusOK, res)
-	} else {
-		extension := hashImage(file)
-
-		// Create
-		db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
-
-		message := fmt.Sprintf("item received: %s", name)
-		res := Response{Message: message}
-
-		return c.JSON(http.StatusOK, res)
-	}
-}
-
-func initialiseDB() *gorm.DB {
-	// Initialise DB
-	db, err := gorm.Open(sqlite.Open("../db/items.db"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
-
-	// Migrate the schema
-	db.AutoMigrate(&Item{})
-	db.AutoMigrate(&Category{})
-
-	return db
-}
-
-func hashImage(file []byte) string {
-	hash := sha256.New()
-	hash.Write([]byte(file))
-	huh := hash.Sum(nil)
-	extension := hex.EncodeToString(huh[:]) + ".jpg"
-	return extension
-}
-
-func getItemsDB(c echo.Context) error {
-	// Initialise DB
-	db := initialiseDB()
-
-	// Read
-	var itemsResponse []ItemResponse
-	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Find(&itemsResponse)
-
-	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
-	copy(itemsResponseCopy, itemsResponse)
-	var itemsResponseArray = ItemsResponseArray{itemsResponseCopy}
-
-	return c.JSON(http.StatusOK, itemsResponseArray)
-}
-
-func getCategoryDB(c echo.Context) error {
-	// Initialise DB
-	db := initialiseDB()
-
-	// Read
-	var category []Category
-	db.Find(&category)
-
-	return c.JSON(http.StatusOK, category)
-}
-
-func getItemDetailDB(c echo.Context) error {
-	// Get ID
-	id := c.Param("itemId")
-
-	// Initialise DB
-	db := initialiseDB()
-
-	// Read
-	var itemResponse ItemResponse
-	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.id = ?", id).Find(&itemResponse)
-	return c.JSON(http.StatusOK, itemResponse)
-}
+// 	return c.JSON(http.StatusOK, res)
+// }
 
 // func getItems(c echo.Context) error {
 // 	filebytes, e := os.ReadFile("items.json")
@@ -262,54 +326,3 @@ func getItemDetailDB(c echo.Context) error {
 // 	}
 // 	return c.JSON(http.StatusOK, msg)
 // }
-
-func searchItems(c echo.Context) error {
-	// Get form values
-	keyword := c.QueryParam("keyword")
-
-	// Initialise DB
-	db := initialiseDB()
-
-	// Search
-	var items []Item
-	db.Where("name = ?", keyword).Find(&items)
-	var itemsResponse []ItemResponse
-	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.name = ?", keyword).Find(&itemsResponse)
-
-	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
-	copy(itemsResponseCopy, itemsResponse)
-	var itemsResponseArray = ItemsResponseArray{itemsResponseCopy}
-
-	return c.JSON(http.StatusOK, itemsResponseArray)
-}
-
-func main() {
-	e := echo.New()
-
-	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Logger.SetLevel(log.INFO)
-
-	front_url := os.Getenv("FRONT_URL")
-	if front_url == "" {
-		front_url = "http://localhost:3000"
-	}
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{front_url},
-		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
-	}))
-
-	// Routes
-	e.GET("/", root)
-	e.POST("/items", addItemDB)
-	e.GET("/items", getItemsDB)
-	e.GET("search", searchItems)
-	e.GET("/image/:itemImg", getImg)
-	e.GET("items/:itemId", getItemDetailDB)
-	e.GET("/category", getCategoryDB)
-	e.GET("/image/:imageFilename", getImg)
-
-	// Start server
-	e.Logger.Fatal(e.Start(":9000"))
-}
