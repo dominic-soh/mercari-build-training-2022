@@ -25,17 +25,17 @@ type Response struct {
 }
 
 type ItemResponse struct {
-	ID       uint `json:"-"`
-	Name     string
-	Category string
-	Image    string
+	ID             uint `json:"-"`
+	Name           string
+	Category       string
+	Image_filename string
 }
 
 type Item struct {
-	ID         uint `json:"-"`
-	Name       string
-	CategoryID uint
-	Image      string
+	ID             uint `json:"-"`
+	Name           string
+	CategoryID     uint
+	Image_filename string
 }
 
 type Category struct {
@@ -61,6 +61,7 @@ func getImg(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 	if _, err := os.Stat(imgPath); err != nil {
+		fmt.Println(err)
 		c.Logger().Debugf("Image not found: %s", imgPath)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
@@ -88,8 +89,14 @@ func addItemDB(c echo.Context) error {
 
 	// Hash image filename
 	extension := hashImage([]byte(image.Filename))
+	newfile, _ := os.Create("image/" + extension)
+	imgBin, err := os.ReadFile("images/" + image.Filename)
+	if err != nil {
+		fmt.Println(err)
+	}
+	newfile.Write(imgBin)
 
-	db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image: extension})
+	db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image_filename: extension})
 	message := fmt.Sprintf("item received: %s", image.Filename)
 	res := Response{Message: message}
 	return c.JSON(http.StatusOK, res)
@@ -123,7 +130,7 @@ func getItemsDB(c echo.Context) error {
 
 	// Read
 	var itemsResponse []ItemResponse
-	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Find(&itemsResponse)
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image_filename").Joins("left join categories on categories.id = items.category_id").Find(&itemsResponse)
 
 	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
 	copy(itemsResponseCopy, itemsResponse)
@@ -152,7 +159,7 @@ func getItemDetailDB(c echo.Context) error {
 
 	// Read
 	var itemResponse ItemResponse
-	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.id = ?", id).Find(&itemResponse)
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image_filename").Joins("left join categories on categories.id = items.category_id").Where("items.id = ?", id).Find(&itemResponse)
 	return c.JSON(http.StatusOK, itemResponse)
 }
 
@@ -167,7 +174,7 @@ func searchItems(c echo.Context) error {
 	var items []Item
 	db.Where("name = ?", keyword).Find(&items)
 	var itemsResponse []ItemResponse
-	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image").Joins("left join categories on categories.id = items.category_id").Where("items.name = ?", keyword).Find(&itemsResponse)
+	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image_filename").Joins("left join categories on categories.id = items.category_id").Where("items.name = ?", keyword).Find(&itemsResponse)
 
 	itemsResponseCopy := make([]ItemResponse, len(itemsResponse))
 	copy(itemsResponseCopy, itemsResponse)
