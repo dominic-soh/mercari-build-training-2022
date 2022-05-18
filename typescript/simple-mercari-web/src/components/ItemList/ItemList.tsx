@@ -46,7 +46,7 @@ export const ItemList: React.FC<Prop> = (props) => {
   
 
   return (
-    <div>
+    <div className='ItemGrid'>
       {items.map((item, index) => {
         return (
           <div key={index} className='ItemList' data-testid={index}>
