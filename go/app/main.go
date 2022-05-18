@@ -88,6 +88,7 @@ func addItemDB(c echo.Context) error {
 	}
 
 	// Hash image filename
+	fmt.Println(image.Filename)
 	extension := hashImage([]byte(image.Filename))
 	newfile, _ := os.Create("image/" + extension)
 	imgBin, err := os.ReadFile("images/" + image.Filename)
