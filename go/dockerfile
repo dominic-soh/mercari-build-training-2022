@@ -20,9 +20,8 @@ RUN go get "github.com/labstack/gommon/log"
 RUN go get "gorm.io/driver/sqlite"
 RUN go get "gorm.io/gorm"
 
-WORKDIR /
-
 COPY ./app/*.go .
+COPY . .
 
 RUN go build -o build2022/app
 

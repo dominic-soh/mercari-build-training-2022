@@ -1,0 +1,22 @@
+version: '3.10'
+services:
+  client:
+    build: 
+      context: ./typescript/simple-mercari-web/
+      dockerfile: dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ~/home/app/frontend
+    environment:
+      - SERVER=http://localhost:9000
+  server:
+    build:
+      context: ./go/
+      dockerfile: dockerfile
+    ports:
+      - "9000:9000"
+    volumes:
+      - ~/home/app/backend
+    environment:
+      - CLIENT=http://localhost:3000
