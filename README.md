@@ -1,3 +1,7 @@
+# HackWeek
+
+https://github.com/mfunyu/mercari-build-2022-HackWeek
+
 # Build@Mercari Training Program 2022
 
 This is @dominic-soh's build training repository.
