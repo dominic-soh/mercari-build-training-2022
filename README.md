@@ -1,5 +1,6 @@
 # HackWeek
-
+Check out my team's hackweek feature demo here!
+Build@Mercari 2022: A new way of listing - Or best offer (OBO)
 https://github.com/mfunyu/mercari-build-2022-HackWeek
 
 # Build@Mercari Training Program 2022
