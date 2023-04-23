@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"mercari-build-training-2022/db/models"
 	"net/http"
 	"os"
 	"path"
@@ -29,18 +30,6 @@ type ItemResponse struct {
 	Name           string
 	Category       string
 	Image_filename string
-}
-
-type Item struct {
-	ID             uint `json:"-"`
-	Name           string
-	CategoryID     uint
-	Image_filename string
-}
-
-type Category struct {
-	ID   uint
-	Name string `gorm:"unique"`
 }
 
 type ItemsResponseArray struct {
@@ -74,9 +63,9 @@ func addItemDB(c echo.Context) error {
 	category := c.FormValue("category")
 	// Initialise DB
 	db := initialiseDB()
-	db.Create(&Category{Name: category})
+	db.Create(&models.Category{Name: category})
 	// Find CategoryID
-	var categoryDBObj Category
+	var categoryDBObj models.Category
 	db.Where("name = ?", category).First(&categoryDBObj)
 
 	// Get image
@@ -96,7 +85,7 @@ func addItemDB(c echo.Context) error {
 	}
 	newfile.Write(imgBin)
 
-	db.Create(&Item{Name: name, CategoryID: categoryDBObj.ID, Image_filename: extension})
+	db.Create(&models.Item{Name: name, CategoryID: categoryDBObj.ID, Image_filename: extension})
 	message := fmt.Sprintf("item received: %s", image.Filename)
 	res := Response{Message: message}
 	return c.JSON(http.StatusOK, res)
@@ -110,8 +99,8 @@ func initialiseDB() *gorm.DB {
 	}
 
 	// Migrate the schema
-	db.AutoMigrate(&Item{})
-	db.AutoMigrate(&Category{})
+	db.AutoMigrate(&models.Item{})
+	db.AutoMigrate(&models.Category{})
 
 	return db
 }
@@ -144,7 +133,7 @@ func getCategoryDB(c echo.Context) error {
 	db := initialiseDB()
 
 	// Read
-	var category []Category
+	var category []models.Category
 	db.Find(&category)
 
 	return c.JSON(http.StatusOK, category)
@@ -171,7 +160,7 @@ func searchItems(c echo.Context) error {
 	db := initialiseDB()
 
 	// Search
-	var items []Item
+	var items []models.Item
 	db.Where("name = ?", keyword).Find(&items)
 	var itemsResponse []ItemResponse
 	db.Table("items").Select("items.id", "items.name as name", "categories.name as category", "items.image_filename").Joins("left join categories on categories.id = items.category_id").Where("items.name = ?", keyword).Find(&itemsResponse)
