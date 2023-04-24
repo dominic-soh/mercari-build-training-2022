@@ -173,6 +173,8 @@ func searchItems(c echo.Context) error {
 }
 
 func main() {
+	// This commented line releases the new main
+	// driver.Server()
 	e := echo.New()
 
 	// Middleware
